@@ -1,0 +1,75 @@
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: chatbot
+spec:
+  domains:
+  - chatbot.example.com
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: chatbot
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: chatbot
+spec:
+  securityPolicy:
+    name: "chatbot"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chatbot
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: chatbot
+    networking.gke.io/v1beta1.FrontendConfig: chatbot
+    networking.gke.io/managed-certificates: chatbot
+spec:
+  defaultBackend:
+    service:
+      name: chatbot
+      port:
+        number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"80": "chatbot"}}'
+spec:
+  type: NodePort
+  selector:
+    app: chatbot
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot
+  labels:
+    app: chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot
+  template:
+    metadata:
+      labels:
+        app: chatbot
+    spec:
+      serviceAccountName: chatbot
+      containers:
+      - name: chatbot
+        image: us-central1-docker.pkg.dev/your-project-here/chatbot/app:latest
